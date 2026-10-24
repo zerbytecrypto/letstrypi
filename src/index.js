@@ -1,4 +1,4 @@
-import { Hono } from 'https://esm.sh/hono';
+import { Hono } from 'hono';
 import { sign, verify } from 'hono/jwt';
 
 const app = new Hono();
