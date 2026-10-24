@@ -1,0 +1,11 @@
+{
+  "name": "pi-web3-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.21.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "cookie-parser": "^1.4.6"
+  }
