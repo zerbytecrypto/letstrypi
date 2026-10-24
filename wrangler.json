@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pi-web3-app",
+  "name": "letstrypiok",
   "main": "src/index.js",
   "compatibility_date": "2026-10-24",
   "compatibility_flags": ["nodejs_compat"],
