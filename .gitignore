@@ -1,0 +1,16 @@
+# Secrets — never commit
+.env
+.env.local
+.dev.vars
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Wrangler / Cloudflare
+.wrangler/
+dist/
+
+# OS junk
+.DS_Store
+Thumbs.db
