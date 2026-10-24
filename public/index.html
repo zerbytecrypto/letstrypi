@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pi Web3 App</title>
+  <!-- Required: the Pi SDK global -->
+  <script src="[sdk.minepi.com](https://sdk.minepi.com/pi-sdk.js)"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px;
+           margin: 0 auto; padding: 24px; background: #0d1117; color: #e6edf3; }
+    button { background: #6f42c1; color: #fff; border: 0; padding: 12px 20px;
+             border-radius: 8px; font-size: 15px; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+            padding: 16px; margin: 16px 0; }
+    pre { white-space: pre-wrap; word-break: break-all; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Pi Web3 App</h1>
+  <div class="card"><span id="status">Initialising…</span></div>
+  <div class="card">
+    <button id="login" disabled>Sign in with Pi</button>
+    <button id="pay" disabled>Pay 0.1 Pi</button>
+  </div>
+  <div class="card">
+    <input id="addr" placeholder="Pi wallet address (G…)" style="width:70%;padding:8px" />
+    <button id="lookup">Read ledger</button>
+    <pre id="chain">—</pre>
+  </div>
+
+  <script>
+    const status = document.getElementById('status');
+    const chain  = document.getElementById('chain');
+    let accessToken = null;
+
+    // Initialise once on page load, before any other SDK call.
+    Pi.init({ version: '2.0', sandbox: true }); // false for production
+
+    // Fires when a previous payment never finished. Never skip this —
+    // an unresolved payment will block all future ones.
+    function onIncompletePaymentFound(payment) {
+      fetch('/api/payments/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction?.txid }),
+      });
+    }
+
+    document.getElementById('login').onclick = async () => {
+      try {
+        const auth = await Pi.authenticate(['username', 'payments'], onIncompletePaymentFound);
+        accessToken = auth.accessToken;
+
+        // Server verifies the token; client-side auth alone proves nothing.
+        const res = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken }),
+        });
+        const user = await res.json();
+        if (!res.ok) throw new Error(user.error);
+
+        status.textContent = `Signed in as @${user.username}`;
+        document.getElementById('pay').disabled = false;
+      } catch (err) {
+        status.textContent = `Auth failed: ${err.message}`;
+      }
+    };
+
+    document.getElementById('pay').onclick = async () => {
+      try {
+        Pi.createPayment(
+          { amount: 0.1, memo: 'Web3 app test', metadata: { item: 'test' } },
+          {
+            onReadyForServerApproval: async (paymentId) => {
+              await fetch('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId }),
+              });
+            },
+            onReadyForServerCompletion: async (paymentId, txid) => {
+              await fetch('/api/payments/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, txid }),
+              });
+              status.textContent = `Paid. Tx ${txid.slice(0, 12)}…`;
+            },
+            onCancel: (paymentId) => (status.textContent = `Cancelled ${paymentId}`),
+            onError: (err) => (status.textContent = `Payment error: ${err.message}`),
+          }
+        );
+      } catch (err) {
+        status.textContent = `Could not start payment: ${err.message}`;
+      }
+    };
+
+    document.getElementById('lookup').onclick = async () => {
+      const addr = document.getElementById('addr').value.trim();
+      if (!addr) return;
+      chain.textContent = 'Reading Pi blockchain…';
+      const [acct, pays] = await Promise.all([
+        fetch(`/api/blockchain/account/${addr}`).then((r) => r.json()),
+        fetch(`/api/blockchain/payments/${addr}`).then((r) => r.json()),
+      ]);
+      chain.textContent = JSON.stringify({ account: acct, recent: pays }, null, 2);
+    };
+
+    // Enable login once the SDK is present.
+    status.textContent = 'Ready';
+    document.getElementById('login').disabled = false;
+  </script>
+</body>
+</html>
